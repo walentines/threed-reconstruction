@@ -1,0 +1,3 @@
+[submodule "controlnet-threed/ControlNet"]
+	path = controlnet-threed/ControlNet
+	url = https://github.com/lllyasviel/ControlNet.git
