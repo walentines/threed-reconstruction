@@ -38,7 +38,7 @@ def numpy_to_pt(images: np.ndarray) -> torch.FloatTensor:
     return images.float() / 255
 
 class RealCarDataset(Dataset):
-    def __init__(self, csv_path, images_folder, control_folder, sam_checkpoint, sam=None, validation=False, model_type='vit_h', grounding_dino_model_id='IDEA-Research/grounding-dino-base', device='cuda:1', sample_size=256, sample_stride=10, sample_n_frames=5, sample_n_times=4):
+    def __init__(self, csv_path, images_folder, control_folder, sam, validation=False, sample_size=256, sample_stride=10, sample_n_frames=5, sample_n_times=4):
         with open(csv_path, 'r') as csvfile:
             self.dataset = pd.read_csv(csvfile)
 
@@ -57,12 +57,7 @@ class RealCarDataset(Dataset):
         self.canny_pixel_transforms = transforms.Compose([
             transforms.Resize(sample_size),
         ])
-        if sam is None:
-            grounding_dino_inference = GroundingDinoInference(grounding_dino_model_id)
-
-            self.sam_inference = SamInference(grounding_dino_inference, sam_checkpoint, model_type, device)
-        else:
-            self.sam_inference = sam
+        self.sam_inference = sam
         self.validation=validation
 
         self.__preprocess_dataset(sample_n_times)

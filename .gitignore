@@ -8,3 +8,8 @@ ml/Train/pipeline/__pycache__
 ml/Train/utils/__pycache__
 ml/Train/rec_para_train.txt
 ml/Train/rec_para.txt
+ml/Train/train_svd.py
+ml/Train/__pycache__
+ml/Train/output_run_sam.txt
+ml/Dataset/train.csv
+ml/Train/tensorboard
