@@ -1,0 +1,6 @@
+adam_weight_decay: 0.01
+conditioning_dropout_prob: 0.2
+gradient_accumulation_steps: 4
+learning_rate: 2.0e-05
+num_train_epochs: 50
+seed: 1234421
