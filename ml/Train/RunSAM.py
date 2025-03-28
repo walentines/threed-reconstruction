@@ -9,11 +9,10 @@ sys.path.append('..')
 from SegmentAnything.SAMInference import SamInference
 from GroundingDino.GroundingDinoInference import GroundingDinoInference
 
-grounding_dino_inference = GroundingDinoInference('IDEA-Research/grounding-dino-base', device='cuda:0')
-sam_inference = SamInference(grounding_dino_inference, 'path_to_weights', 'vit_h', device='cuda:0')
+grounding_dino_inference = GroundingDinoInference('IDEA-Research/grounding-dino-base', device='cuda:1')
+sam_inference = SamInference(grounding_dino_inference, '../SegmentAnything/segment-anything/weights/sam_vit_h_4b8939.pth', 'vit_h', device='cuda:1')
 
-DIR = 'your_dir'
-
+DIR = 'path/to/dir'
 
 if __name__ == '__main__':
     dirs = os.listdir(DIR)
@@ -26,7 +25,8 @@ if __name__ == '__main__':
             if not os.path.exists(segmentation_path):
                 with torch.no_grad():
                     segmentation = sam_inference.run_inference(image_path, 'car.')
-                cv2.imwrite(segmentation_path, segmentation)
+                if segmentation is not None:
+                    cv2.imwrite(segmentation_path, segmentation)
 
 
 

@@ -12,7 +12,7 @@ import torchvision
 import torch.distributed as dist
 from PIL import Image
 import datetime
-
+from utils.CustomCLIPTextModel import CustomModel
 from safetensors import safe_open
 from tqdm import tqdm
 from einops import rearrange
@@ -26,7 +26,7 @@ from accelerate.utils import ProjectConfiguration, set_seed
 from accelerate import Accelerator
 import transformers
 import diffusers
-from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
+from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection, CLIPTextModelWithProjection, CLIPProcessor
 from models.unet_spatio_temporal_condition_controlnet import UNetSpatioTemporalConditionControlNetModel
 from diffusers.utils.import_utils import is_xformers_available
 from packaging import version
@@ -352,16 +352,18 @@ def _resize_with_antialiasing(input, size, interpolation="bicubic", align_corner
         input, size=size, mode=interpolation, align_corners=align_corners)
     return output
 
-def make_dataset(config, sam, mode):
+def make_dataset(config, sam, mode, depth=False):
     # Get the datasets: you can either provide your own training and evaluation files (see below)
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
 
     # In distributed training, the load_dataset function guarantees that only one local process can concurrently
     # download the dataset.
     if mode == 'training':
-        dataset = RealCarDataset(config.dataloader.training.csv_path,config.dataloader.training.video_folder,config.dataloader.training.condition_folder, sam=sam, sample_n_frames=config.dataloader.training.sample_n_frames)
+        dataset = RealCarDataset(config.dataloader.training.csv_path,config.dataloader.training.video_folder,config.dataloader.training.condition_folder, sam=sam, sample_n_frames=config.dataloader.training.sample_n_frames, sample_n_times=config.dataloader.training.sample_n_times, depth=depth)
     elif mode == 'validation':
-        dataset = RealCarDataset(config.dataloader.validation.csv_path,config.dataloader.validation.video_folder,config.dataloader.validation.condition_folder, sam=sam, sample_n_frames=config.dataloader.validation.sample_n_frames, sample_n_times=config.dataloader.validation.sample_n_times, validation=True)
+        dataset = RealCarDataset(config.dataloader.validation.csv_path,config.dataloader.validation.video_folder,config.dataloader.validation.condition_folder, sam=sam, sample_n_frames=config.dataloader.validation.sample_n_frames, sample_n_times=config.dataloader.validation.sample_n_times, validation=True, depth=depth)
+    elif mode == 'test':
+        dataset = RealCarDataset(config.dataloader.test.csv_path,config.dataloader.test.video_folder,config.dataloader.test.condition_folder, sam=sam, sample_n_frames=config.dataloader.test.sample_n_frames, sample_n_times=config.dataloader.test.sample_n_times, validation=True, sample_stride=10, depth=depth)
     else:
         raise RuntimeError('Please choose between training and validation')
     return dataset
@@ -436,7 +438,8 @@ def setup_accelerator(config, logger):
     accelerator_project_config = ProjectConfiguration(project_dir=config.trainer.output_dir, logging_dir=logging_dir)
     accelerator = Accelerator(gradient_accumulation_steps=config.trainer.gradient_accumulation_steps, 
                                 mixed_precision=config.trainer.mixed_precision,
-                                project_config=accelerator_project_config)
+                                project_config=accelerator_project_config,
+                                log_with="tensorboard")
     
     generator = torch.Generator(device=accelerator.device).manual_seed(config.trainer.seed)
 
@@ -459,9 +462,9 @@ def setup_accelerator(config, logger):
     return accelerator, generator
 
 def encode_image(pixel_values, feature_extractor, image_encoder):
-    pixel_values = pixel_values * 2.0 - 1.0
+    # pixel_values = pixel_values * 2.0 - 1.0
     pixel_values = _resize_with_antialiasing(pixel_values, (224, 224))
-    pixel_values = (pixel_values + 1.0) / 2.0
+    pixel_values = pixel_values * 0.5 + 0.5
 
     # Normalize the image with for CLIP input
     pixel_values = feature_extractor(
@@ -476,6 +479,15 @@ def encode_image(pixel_values, feature_extractor, image_encoder):
     image_embeddings = image_encoder(pixel_values).image_embeds
     image_embeddings= image_embeddings.unsqueeze(1)
     return image_embeddings
+
+def encode_text(text, feature_extractor, text_encoder):
+    # Normalize the text with for CLIP input
+    text = torch.tensor(feature_extractor(
+        text=text
+    ).input_ids).to(text_encoder.text_model.device)
+
+    text_embeddings = text_encoder(text.unsqueeze(0))
+    return text_embeddings
 
 def validate_and_convert_image(image, target_size=(256, 256)):
     if image is None:
@@ -519,9 +531,10 @@ def create_image_grid(images, rows, cols, target_size=(256, 256)):
 
 def save_combined_frames(batch_output, validation_images, validation_control_images,output_folder):
     # Flatten batch_output, which is a list of lists of PIL Images
-    flattened_batch_output = [img for sublist in batch_output for img in sublist]
-    validation_images = [torchvision.transforms.functional.to_pil_image((validation_image * 255).type(torch.uint8)) for validation_image in validation_images]
-    validation_control_images = [torchvision.transforms.functional.to_pil_image((validation_control_image * 255).type(torch.uint8)) for validation_control_image in validation_control_images]
+    # flattened_batch_output = [img for sublist in batch_output for img in sublist]
+    flattened_batch_output = [torchvision.transforms.functional.to_pil_image(img) for img in batch_output]
+    validation_images = [torchvision.transforms.functional.to_pil_image(((validation_image * 0.5 + 0.5) * 255).type(torch.uint8)) for validation_image in validation_images]
+    validation_control_images = [torchvision.transforms.functional.to_pil_image(((validation_control_image * 0.5 + 0.5) * 255).type(torch.uint8)) for validation_control_image in validation_control_images]
 
     # Combine frames into a list without converting (since they are already PIL Images)
     combined_frames = validation_images + validation_control_images + flattened_batch_output
