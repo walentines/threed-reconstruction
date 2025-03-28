@@ -13,3 +13,8 @@ ml/Train/__pycache__
 ml/Train/output_run_sam.txt
 ml/Dataset/train.csv
 ml/Train/tensorboard
+ml/2024_04_22_10_35_34
+ml/DepthAnything/__pycache__
+ml/DepthAnything/weights
+ml/Inference/results
+ml/Dataset/hydra_config/config_create_dataset_csv_split.yaml
