@@ -35,6 +35,10 @@ class CreateDatasetCsvSplit:
     def __call__(self):
         self.__compute_csv()
 
-if __name__ == '__main__':
-    csv_generator = CreateDatasetCsvSplit('/mnt/hddmount1/sei2clj/HQ339', 0.1, 0.1, 'csv')
+@hydra.main(version_base=None, config_path="hydra_config", config_name="config_hydra")
+def main(cfg):
+    csv_generator = CreateDatasetCsvSplit(cfg.dataset_path, 0.05, 0.05, 'csv')
     csv_generator()
+
+if __name__ == '__main__':
+    main()
