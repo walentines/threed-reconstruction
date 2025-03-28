@@ -14,7 +14,8 @@ class SamInference:
     
     def run_inference(self, image_path, text):
         bounding_box = self.grounding_dino.run_inference(image_path, text)
-
+        if bounding_box is None:
+            return None
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
@@ -28,12 +29,3 @@ class SamInference:
             )
 
         return masks[0].astype(np.uint8) * 255
-
-# if __name__ == '__main__':
-#     grounding_dino = GroundingDinoInference('IDEA-Research/grounding-dino-base', 'cuda')
-#     sam_inference = SamInference(grounding_dino, 'segment-anything/weights/sam_vit_h_4b8939.pth', 'vit_h', 'cuda')
-#     sam_inference.run_inference('/mnt/hddmount1/sei2clj/HQ339/2024_01_18_15_41_12/frame_00986.jpg', 'car.')
-
-
-        
-
